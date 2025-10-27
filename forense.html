@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prototipo Forense Interactivo</title>
+  <style>
+    :root{--bg:#111;--card:#1b1b1b;--accent:#9bd3c4;--muted:#cfcfcf}
+    body{margin:0;font-family:Inter, Roboto, Arial, sans-serif;background:linear-gradient(180deg,#0b0b0b,#131313);color:var(--muted);height:100vh;display:flex;align-items:stretch}
+    header{padding:12px 16px;background:linear-gradient(90deg,#0f1720, #0b1020);border-bottom:1px solid rgba(255,255,255,0.03)}
+    .app{display:grid;grid-template-columns:320px 1fr 300px;gap:16px;padding:18px;width:100%}
+    .panel{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+    .left{display:flex;flex-direction:column;gap:12px;height:calc(100vh - 80px);overflow:auto}
+    h2{margin:6px 0 10px;color:var(--accent)}
+    .tools{display:flex;flex-wrap:wrap;gap:8px}
+    .tool{background:#0f1417;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.03);min-width:120px;text-align:center}
+    .tool.active{outline:2px solid rgba(155,211,196,0.16);box-shadow:0 4px 12px rgba(0,0,0,0.6)}
+    .scene{position:relative;background:linear-gradient(180deg,#222,#1a1a1a);border-radius:12px;min-height:520px;padding:18px;display:flex;align-items:center;justify-content:center}
+    .room{width:820px;height:460px;background:linear-gradient(180deg,#2a2a2a,#1f1f1f);border-radius:8px;position:relative;box-shadow:inset 0 0 60px rgba(0,0,0,0.4)}
+    /* objects */
+    .object{position:absolute;border-radius:6px;padding:6px;color:#111;cursor:pointer;user-select:none}
+    .body{left:340px;top:170px;width:140px;height:60px;background:linear-gradient(180deg,#b0a7a3,#7f6f6b)}
+    .blood{left:300px;top:250px;width:60px;height:60px;background:radial-gradient(circle at 40% 40%,rgba(180,20,20,0.95),rgba(150,18,18,0.9) 60%, rgba(120,18,18,0.6));border-radius:50%}
+    .knife{left:220px;top:200px;width:60px;height:16px;background:linear-gradient(90deg,#cfcfcf,#7b7b7b);transform:rotate(-22deg)}
+    .foot{left:420px;top:320px;width:36px;height:60px;background:linear-gradient(180deg,#6b6b6b,#3d3d3d);border-radius:18px}
+    .tooltip{position:absolute;left:16px;bottom:16px;background:rgba(0,0,0,0.6);padding:10px;border-radius:8px;max-width:420px}
+    .right{display:flex;flex-direction:column;gap:12px;height:calc(100vh - 80px);overflow:auto}
+    .inventory{display:flex;flex-direction:column;gap:8px}
+    .inv-slot{background:#0f1417;padding:8px;border-radius:8px;min-height:44px;border:1px dashed rgba(255,255,255,0.03)}
+    .log{height:200px;overflow:auto;padding:8px;background:#0f1213;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
+    .btn{background:var(--accent);color:#081214;padding:8px 10px;border-radius:8px;border:none;cursor:pointer}
+    footer{padding:12px 18px;color:#9aa;display:flex;justify-content:space-between}
+    .badge{background:#071014;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03)}
+    @media(max-width:1100px){.app{grid-template-columns:1fr;grid-auto-rows:auto}}
+  </style>
+</head>
+<body>
+  <div style="position:fixed;left:18px;top:12px;color:var(--muted)">
+    <strong>Prototipo:</strong> Forense interactivo — escena inicial
+  </div>
+  <div class="app">
+    <div class="panel left">
+      <h2>Herramientas</h2>
+      <div class="tools" id="tools">
+        <div class="tool" data-tool="gloves">Guantes</div>
+        <div class="tool" data-tool="uv">Lámpara UV</div>
+        <div class="tool" data-tool="tweezers">Pinzas / Bolsa</div>
+        <div class="tool" data-tool="cleaner">Kit de limpieza</div>
+        <div class="tool" data-tool="camera">Cámara</div>
+      </div>
+
+      <h2>Instrucciones</h2>
+      <div class="badge">Objetivo: recolectar evidencia sin destruirla y limpiar la escena.</div>
+      <ul style="margin-top:8px;line-height:1.5;color:#bfcfc0">
+        <li>Seleccioná una herramienta y luego hacé clic sobre objetos en la escena.</li>
+        <li>Usá <strong>Lámpara UV</strong> para revelar manchas ocultas.</li>
+        <li>Recolectá evidencia con <strong>Pinzas / Bolsa</strong> antes de limpiar.</li>
+        <li>Si limpias sin recolectar, <em>podés perder puntos</em> (evidencia destruida).</li>
+      </ul>
+
+      <h2>Estado</h2>
+      <div class="badge" id="score">Puntos: 0</div>
+
+    </div>
+
+    <div class="panel scene">
+      <div class="room" id="room">
+        <div class="object body" id="body" title="Cuerpo">
+          <!-- visual body -->
+        </div>
+        <div class="object blood" id="blood" title="Mancha sospechosa"></div>
+        <div class="object knife" id="knife" title="Cuchillo"></div>
+        <div class="object foot" id="foot" title="Huella"></div>
+
+        <div class="tooltip" id="tooltip">Seleccioná una herramienta y clickeá objetos.</div>
+      </div>
+    </div>
+
+    <div class="panel right">
+      <h2>Inventario / Evidencia</h2>
+      <div class="inventory" id="inventory">
+        <div class="inv-slot" data-id="slot1">Slot 1: vacío</div>
+        <div class="inv-slot" data-id="slot2">Slot 2: vacío</div>
+        <div class="inv-slot" data-id="slot3">Slot 3: vacío</div>
+      </div>
+
+      <h2>Registro</h2>
+      <div class="log" id="log"></div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" id="reset">Reiniciar escena</button>
+        <button class="btn" id="hint">Pista</button>
+      </div>
+
+    </div>
+  </div>
+  <footer>
+    <div>Prot. rápido — versión demo</div>
+    <div class="badge">Hecho para: juego forense educativo</div>
+  </footer>
+
+  <script>
+    // Estado del juego
+    const state = {
+      selectedTool: null,
+      inventory: [null,null,null],
+      score: 0,
+      revealedBlood: false,
+      evidenceCollected: {knife:false,blood:false,foot:false}
+    }
+
+    const toolsEl = document.getElementById('tools')
+    const tooltip = document.getElementById('tooltip')
+    const logEl = document.getElementById('log')
+    const scoreEl = document.getElementById('score')
+    const inventoryEls = document.querySelectorAll('.inv-slot')
+
+    function log(msg){
+      const p = document.createElement('div')
+      p.textContent = (new Date()).toLocaleTimeString() + ' — ' + msg
+      logEl.prepend(p)
+    }
+
+    // Tool selection
+    toolsEl.addEventListener('click', e=>{
+      const t = e.target.closest('.tool')
+      if(!t) return
+      document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'))
+      t.classList.add('active')
+      state.selectedTool = t.dataset.tool
+      tooltip.textContent = 'Herramienta seleccionada: ' + t.textContent
+      log('Seleccionó herramienta: ' + t.textContent)
+    })
+
+    // Object interactions
+    function interact(obj){
+      const tool = state.selectedTool
+      if(!tool){ tooltip.textContent = 'Seleccioná primero una herramienta.'; return }
+      if(obj==='blood'){
+        if(tool==='uv'){
+          if(!state.revealedBlood){ state.revealedBlood=true; tooltip.textContent='Se revela una mancha de sangre que antes no se veía.'; log('Se reveló mancha de sangre con UV.'); state.score += 10 }
+          else { tooltip.textContent='La mancha ya está revelada.' }
+        } else if(tool==='tweezers'){
+          if(state.revealedBlood && !state.evidenceCollected.blood){ collectEvidence('blood', 'Muestra de sangre'); }
+          else if(!state.revealedBlood){ tooltip.textContent='No ves la mancha suficiente para tomar muestra. Probá con UV.' }
+          else { tooltip.textContent='Ya recolectaste esa muestra.' }
+        } else if(tool==='cleaner'){
+          if(state.evidenceCollected.blood){ tooltip.textContent='Limpiaste la mancha sin destruir evidencia restante.'; log('Se limpió la mancha.'); state.score += 5; document.getElementById('blood').style.opacity = '0.15' }
+          else { tooltip.textContent='Al limpiar sin recolectar, podrías destruir evidencia. ¡Has perdido puntos!'; state.score -= 15; log('Evidencia destruida al limpiar sin recolectar.'); document.getElementById('blood').style.opacity='0.15' }
+        } else if(tool==='camera'){ tooltip.textContent='Tomaste fotos de la mancha.'; log('Foto tomada de la mancha.'); state.score += 2 }
+        else { tooltip.textContent='Esa herramienta no es efectiva aquí.' }
+      }
+
+      if(obj==='knife'){
+        if(tool==='tweezers'){
+          if(!state.evidenceCollected.knife){ collectEvidence('knife','Cuchillo con residuos'); }
+          else tooltip.textContent='Ya recolectaste el cuchillo.'
+        } else if(tool==='gloves'){
+          tooltip.textContent='Te pusiste guantes para manipular cuidadosamente.'; log('Se usaron guantes.')
+        } else if(tool==='cleaner'){
+          tooltip.textContent='Limpiar el cuchillo ahora puede eliminar huellas: riesgo.'; state.score -= 8; log('Posible destrucción de evidencia en el cuchillo.'); document.getElementById('knife').style.opacity='0.4'
+        } else { tooltip.textContent='Ese uso no es apropiado.' }
+      }
+
+      if(obj==='foot'){
+        if(tool==='uv'){
+          tooltip.textContent='La huella se acentúa con polvo forense visible con UV.'; log('Huella inspeccionada con UV.'); state.score += 5 }
+        else if(tool==='tweezers'){
+          if(!state.evidenceCollected.foot){ collectEvidence('foot','Muestra de huella'); }
+          else tooltip.textContent='Huella ya tomada.'
+        } else tooltip.textContent='Probá con UV o pinzas.'
+      }
+
+      updateScore()
+    }
+
+    function collectEvidence(key,label){
+      // find free inventory slot
+      const idx = state.inventory.findIndex(x=>x===null)
+      if(idx===-1){ tooltip.textContent='Inventario lleno. Liberá un slot antes de recolectar.'; log('Intento de recolectar sin espacio de inventario.'); return }
+      state.inventory[idx] = {key,label}
+      state.evidenceCollected[key]=true
+      inventoryEls[idx].textContent = label
+      tooltip.textContent = 'Recolectaste: ' + label
+      log('Recolectada evidencia: ' + label)
+      state.score += 15
+    }
+
+    // Click handlers for objects
+    document.getElementById('blood').addEventListener('click', ()=>interact('blood'))
+    document.getElementById('knife').addEventListener('click', ()=>interact('knife'))
+    document.getElementById('foot').addEventListener('click', ()=>interact('foot'))
+    document.getElementById('body').addEventListener('click', ()=>{ tooltip.textContent='Cuerpo: observá contusiones y posición. Usá cámara o guantes.'; log('Inspeccionaron el cuerpo.'); state.score += 1; updateScore() })
+
+    function updateScore(){ scoreEl.textContent = 'Puntos: ' + state.score }
+
+    // Reset
+    document.getElementById('reset').addEventListener('click', ()=>{
+      state.selectedTool=null; state.inventory=[null,null,null]; state.score=0; state.revealedBlood=false; state.evidenceCollected={knife:false,blood:false,foot:false}
+      document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'))
+      inventoryEls.forEach((el,i)=>el.textContent = 'Slot '+(i+1)+': vacío')
+      document.getElementById('blood').style.opacity = '1'
+      document.getElementById('knife').style.opacity = '1'
+      document.getElementById('log').innerHTML = ''
+      tooltip.textContent = 'Seleccioná una herramienta y clickeá objetos.'
+      updateScore(); log('Escena reiniciada.')
+    })
+
+    document.getElementById('hint').addEventListener('click', ()=>{
+      log('Pista activada: Usá la lámpara UV para revelar manchas ocultas y luego recolectá con pinzas.')
+      tooltip.textContent = 'Pista: Usá UV → Pinzas → Bolsa → Limpiar'
+    })
+
+    // Small accessibility: allow selecting tool via number keys 1-5
+    window.addEventListener('keydown', (e)=>{
+      const map = {Digit1:'gloves',Digit2:'uv',Digit3:'tweezers',Digit4:'cleaner',Digit5:'camera'}
+      if(map[e.code]){
+        document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'))
+        const el = document.querySelector(`.tool[data-tool="${map[e.code]}"]`)
+        if(el){ el.classList.add('active'); state.selectedTool = map[e.code]; tooltip.textContent = 'Herramienta seleccionada: ' + el.textContent; log('Herramienta rápida: ' + el.textContent) }
+      }
+    })
+
+    // Init
+    updateScore(); tooltip.textContent = 'Seleccioná una herramienta y clickeá los objetos para interactuar.'
+
+  </script>
+</body>
+</html>
